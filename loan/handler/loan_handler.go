@@ -23,7 +23,7 @@ func (h *LoanHandler) SubmitLoan(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	loan := h.loanService.SubmitLoan(&req)
+	loan, _ := h.loanService.SubmitLoan(&req)
 	c.JSON(http.StatusCreated, loan)
 }
 

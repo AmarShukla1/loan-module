@@ -1,11 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
-
-	"github.com/gin-gonic/gin"
 
 	agentHandler "loan-module/agent/handler"
 	agentRepo "loan-module/agent/repository"
@@ -25,6 +25,10 @@ import (
 )
 
 func main() {
+	// Create a root context with cancellation
+	rootCtx, rootCancel := context.WithCancel(context.Background())
+	defer rootCancel()
+
 	dsn := "host=localhost user=AmarShukla password=secret dbname=loandb port=5432 sslmode=disable TimeZone=UTC"
 	if dsn == "" {
 		log.Fatal("DATABASE_DSN environment variable not set")
@@ -52,8 +56,8 @@ func main() {
 	// Initialize sample data
 	initSampleData(agentRepository)
 
-	// Start loan processor
-	go loanService.StartLoanProcessor()
+	// Start loan processor with context
+	go loanService.StartLoanProcessor(rootCtx)
 
 	// Setup router
 	router := gin.Default()
@@ -89,8 +93,9 @@ func initSampleData(agentRepo *agentRepo.AgentRepository) {
 
 //services is core
 //check all apis implementation
-//agent shouldn't be a manager of itself
-//implement mutex or thread safety
 //status count and pagination dekho
-//have to add doc..
+
+//agent shouldn't be a manager of itself
+
+//implement mutex or thread safety
 //add yaml file for db

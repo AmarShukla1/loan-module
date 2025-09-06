@@ -1,9 +1,11 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
+	"sync"
 	"time"
 
 	agent "loan-module/agent/repository"
@@ -38,7 +40,7 @@ func NewLoanService(
 	}
 }
 
-func (s *LoanService) SubmitLoan(req *loanModels.SubmitLoanRequest) *loanModels.Loan {
+func (s *LoanService) SubmitLoan(req *loanModels.SubmitLoanRequest) (*loanModels.Loan, error) {
 	// Check if customer exists by phone number
 	customer, exists := s.customerRepo.GetCustomerByPhone(req.CustomerPhone)
 
@@ -56,20 +58,38 @@ func (s *LoanService) SubmitLoan(req *loanModels.SubmitLoanRequest) *loanModels.
 		LoanAmount: req.LoanAmount,
 		LoanType:   req.LoanType,
 	}
-	return s.repo.AddLoan(loan)
+	loan, err := s.repo.AddLoan(loan)
+	if err != nil {
+		return nil, err
+	}
+	
+	return loan, nil
 }
 
-func (s *LoanService) StartLoanProcessor() {
+func (s *LoanService) StartLoanProcessor(ctx context.Context) {
 	log.Println("Starting loan processor with worker pool...")
 
 	jobChan := make(chan *loanModels.Loan, 100)
 
 	// Start workers
+	var wg sync.WaitGroup
 	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
 		go func(workerID int) {
-			for loan := range jobChan {
-				log.Printf("[Worker %d] Processing loan %d", workerID, loan.ID)
-				s.processLoan(loan)
+			defer wg.Done()
+			for {
+				select {
+				case loan, ok := <-jobChan:
+					if !ok {
+						log.Printf("[Worker %d] Shutting down", workerID)
+						return
+					}
+					log.Printf("[Worker %d] Processing loan %d", workerID, loan.ID)
+					s.processLoan(loan)
+				case <-ctx.Done():
+					log.Printf("[Worker %d] Context cancelled, shutting down", workerID)
+					return
+				}
 			}
 		}(i + 1)
 	}
@@ -79,12 +99,25 @@ func (s *LoanService) StartLoanProcessor() {
 	defer ticker.Stop()
 
 	for {
-		<-ticker.C
-		loans := s.repo.GetLoansByStatus(loanModels.Applied)
-		for _, loan := range loans {
-			loan.ApplicationStatus = loanModels.Processing
-			s.repo.UpdateLoan(loan)
-			jobChan <- loan
+		select {
+		case <-ticker.C:
+			loans := s.repo.GetLoansByStatus(loanModels.Applied)
+			for _, loan := range loans {
+				// Update loan status
+				loan.ApplicationStatus = loanModels.Processing
+				if err := s.repo.UpdateLoan(loan); err != nil {
+					log.Printf("Error updating loan %d status: %v", loan.ID, err)
+					continue
+				}
+				
+				// Send to job channel
+				jobChan <- loan
+			}
+		case <-ctx.Done():
+			log.Println("Context cancelled, stopping job feeder")
+			close(jobChan)
+			wg.Wait()
+			return
 		}
 	}
 }
@@ -94,44 +127,62 @@ func (s *LoanService) processLoan(loan *loanModels.Loan) {
 	log.Printf("Processing loan %d, waiting %v seconds...", loan.ID, delay.Seconds())
 	time.Sleep(delay)
 
-	var newStatus loanModels.LoanStatus
-
-	// Get customer for notification
+	// Get customer for notification without locking first
 	customer, exists := s.customerRepo.GetCustomerByID(loan.CustomerID)
 	if !exists {
 		log.Printf("Customer not found for loan %d", loan.ID)
 		return
 	}
 
+	// Determine the loan status based on amount
+	var newStatus loanModels.LoanStatus
 	switch {
 	case loan.LoanAmount < 10000:
+	
+		
 		newStatus = loanModels.ApprovedBySystem
 		s.notificationService.SendSMS(customer.Phone, "Your loan has been approved by system.")
+		
+		loan.ApplicationStatus = newStatus
+		if err := s.repo.UpdateLoan(loan); err != nil {
+			log.Printf("Error updating loan %d: %v", loan.ID, err)
+		}
+		
 	case loan.LoanAmount > 500000:
+	
+		
 		newStatus = loanModels.RejectedBySystem
 		s.notificationService.SendSMS(customer.Phone, "loan application has been rejected by system.")
+		
+		loan.ApplicationStatus = newStatus
+		if err := s.repo.UpdateLoan(loan); err != nil {
+			log.Printf("Error updating loan %d: %v", loan.ID, err)
+		}
+		
 	default:
-		newStatus = loanModels.UnderReview
-		s.assignToAgent(loan, customer)
+		err := s.assignToAgent(loan, customer)
+		if err != nil {
+			log.Printf("Error assigning loan %d to agent: %v", loan.ID, err)
+		}
 	}
-
-	loan.ApplicationStatus = newStatus
-	s.repo.UpdateLoan(loan)
 }
 
-func (s *LoanService) assignToAgent(loan *loanModels.Loan, customer *models.Customer) {
+func (s *LoanService) assignToAgent(loan *loanModels.Loan, customer *models.Customer) error {
 	agent := s.agentRepo.GetAvailableAgent()
 	if agent == nil {
 		log.Printf("No available agent for loan %d", loan.ID)
-		return
+		return fmt.Errorf("no available agent for loan %d", loan.ID)
 	}
 
 	// Assign the loan to agent first
 	loan.AssignedAgentID = &agent.ID
-	s.repo.UpdateLoan(loan)
+	loan.ApplicationStatus = loanModels.UnderReview
 
-	// Create assignment record
-	s.repo.AssignLoanToAgent(loan, agent.ID)
+	// Create assignment record using transaction
+	if err := s.repo.AssignLoanToAgent(loan, agent.ID); err != nil {
+		log.Printf("Error assigning loan %d to agent %d: %v", loan.ID, agent.ID, err)
+		return err
+	}
 
 	// Send notifications
 	s.notificationService.SendPushNotification(agent.ID,
@@ -143,6 +194,7 @@ func (s *LoanService) assignToAgent(loan *loanModels.Loan, customer *models.Cust
 	}
 
 	log.Printf("Loan %d assigned to agent %d (%s)", loan.ID, agent.ID, agent.Name)
+	return nil
 }
 
 func (s *LoanService) GetStatusCount() []loanModels.StatusCountResponse {
@@ -180,8 +232,8 @@ func (s *LoanService) GetLoanByID(id int) (*loanModels.Loan, bool) {
 	return s.repo.GetLoanByID(id)
 }
 
-func (s *LoanService) UpdateLoan(loan *loanModels.Loan) {
-	s.repo.UpdateLoan(loan)
+func (s *LoanService) UpdateLoan(loan *loanModels.Loan) error {
+	return s.repo.UpdateLoan(loan)
 }
 
 func (s *LoanService) GetTopCustomers() []loanModels.TopCustomerResponse {

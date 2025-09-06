@@ -15,10 +15,25 @@ func NewLoanRepository(db *database.Database) *LoanRepository {
 	return &LoanRepository{db: db}
 }
 
-func (r *LoanRepository) AddLoan(loan *models.Loan) *models.Loan {
+func (r *LoanRepository) AddLoan(loan *models.Loan) (*models.Loan, error) {
+	tx := r.db.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
 	loan.ApplicationStatus = models.Applied
-	r.db.DB.Create(loan)
-	return loan
+	if err := tx.Create(loan).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
+	}
+
+	return loan, nil
 }
 
 func (r *LoanRepository) GetLoanByID(id int) (*models.Loan, bool) {
@@ -39,8 +54,20 @@ func (r *LoanRepository) GetAllLoans() []*models.Loan {
 	return loans
 }
 
-func (r *LoanRepository) UpdateLoan(loan *models.Loan) {
-	r.db.DB.Save(loan)
+func (r *LoanRepository) UpdateLoan(loan *models.Loan) error {
+	tx := r.db.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err := tx.Save(loan).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
 }
 
 func (r *LoanRepository) GetStatusCount() map[models.LoanStatus]int {
@@ -54,11 +81,33 @@ func (r *LoanRepository) GetStatusCount() map[models.LoanStatus]int {
 	return counts
 }
 
-func (r *LoanRepository) AssignLoanToAgent(loan *models.Loan, agentID int) {
+func (r *LoanRepository) AssignLoanToAgent(loan *models.Loan, agentID int) error {
+	tx := r.db.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Update loan with agent ID and status
+	if err := tx.Model(loan).Updates(map[string]interface{}{
+		"assigned_agent_id": agentID,
+		"application_status": models.UnderReview,
+	}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Create assignment record
 	assignment := models.LoanAssignment{
 		LoanID:     loan.ID,
 		AgentID:    agentID,
 		AssignedAt: time.Now(),
 	}
-	r.db.DB.Create(&assignment)
+	if err := tx.Create(&assignment).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
 }
