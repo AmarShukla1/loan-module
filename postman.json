@@ -1,0 +1,195 @@
+{
+  "info": {
+    "name": "Loan Origination System API",
+    "description": "Complete API collection for testing the Loan Origination System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Submit Loan Application",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customer_name\": \"John Doe\",\n  \"customer_phone\": \"+1234567890\",\n  \"loan_amount\": 50000,\n  \"loan_type\": \"PERSONAL\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/loans",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "v1", "loans"]
+        }
+      }
+    },
+    {
+      "name": "Submit Small Loan (Auto-Approve)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customer_name\": \"Alice Smith\",\n  \"customer_phone\": \"+1987654321\",\n  \"loan_amount\": 5000,\n  \"loan_type\": \"PERSONAL\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/loans",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "v1", "loans"]
+        }
+      }
+    },
+    {
+      "name": "Submit Large Loan (Auto-Reject)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customer_name\": \"Bob Johnson\",\n  \"customer_phone\": \"+1555666777\",\n  \"loan_amount\": 1000000,\n  \"loan_type\": \"BUSINESS\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/loans",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "v1", "loans"]
+        }
+      }
+    },
+    {
+      "name": "Get Loan Status Counts",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:8080/api/v1/loans/status-count",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "v1", "loans", "status-count"]
+        }
+      }
+    },
+    {
+      "name": "Get Applied Loans",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:8080/api/v1/loans?status=APPLIED&page=1&size=10",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "v1", "loans"],
+          "query": [
+            {
+              "key": "status",
+              "value": "APPLIED"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "size",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Under Review Loans",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:8080/api/v1/loans?status=UNDER_REVIEW&page=1&size=10",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "v1", "loans"],
+          "query": [
+            {
+              "key": "status",
+              "value": "UNDER_REVIEW"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "size",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Agent Approve Loan",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"decision\": \"APPROVE\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/agents/2/loans/1/decision",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "v1", "agents", "2", "loans", "1", "decision"]
+        }
+      }
+    },
+    {
+      "name": "Agent Reject Loan",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"decision\": \"REJECT\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/agents/3/loans/2/decision",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "v1", "agents", "3", "loans", "2", "decision"]
+        }
+      }
+    },
+    {
+      "name": "Get Top Customers",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:8080/api/v1/customers/top",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "v1", "customers", "top"]
+        }
+      }
+    }
+  ]
+}
