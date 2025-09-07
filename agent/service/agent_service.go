@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 
+	"loan-module/agent/models"
 	"loan-module/agent/repository"
 	customerRepo "loan-module/customer/repository"
 	loanModels "loan-module/loan/models"
@@ -29,6 +30,24 @@ func NewAgentService(
 		customerRepo:        customerRepo,
 		notificationService: notificationService,
 	}
+}
+
+func (s *AgentService) CreateAgent(req *models.CreateAgentRequest) (*models.Agent, error) {
+	// Validate manager ID if provided
+	if req.ManagerID != nil {
+		_, exists := s.repo.GetAgentByID(*req.ManagerID)
+		if !exists {
+			return nil, errors.New("manager not found")
+		}
+	}
+
+	// Create the agent without specifying ID to let the database auto-increment
+	agent := &models.Agent{
+		Name:      req.Name,
+		ManagerID: req.ManagerID,
+	}
+
+	return s.repo.AddAgent(agent)
 }
 
 func (s *AgentService) MakeDecision(agentID, loanID int, decision string) (*loanModels.Loan, error) {

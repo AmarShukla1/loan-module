@@ -6,20 +6,24 @@ import (
 )
 
 type AgentRepository struct {
-	db *database.Database
+	DB *database.Database
 }
 
 func NewAgentRepository(db *database.Database) *AgentRepository {
-	return &AgentRepository{db: db}
+	return &AgentRepository{DB: db}
 }
 
-func (r *AgentRepository) AddAgent(agent *models.Agent) {
-	r.db.DB.Create(agent)
+func (r *AgentRepository) AddAgent(agent *models.Agent) (*models.Agent, error) {
+	result := r.DB.DB.Create(agent)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return agent, nil
 }
 
 func (r *AgentRepository) GetAgentByID(id int) (*models.Agent, bool) {
 	var agent models.Agent
-	result := r.db.DB.First(&agent, id)
+	result := r.DB.DB.First(&agent, id)
 	return &agent, result.Error == nil
 }
 
@@ -30,7 +34,7 @@ func (r *AgentRepository) GetAvailableAgent() *models.Agent {
 	}
 
 	var loads []AgentLoad
-	r.db.DB.Raw(`
+	r.DB.DB.Raw(`
         SELECT a.id, COUNT(l.id) as count
         FROM agents a
         LEFT JOIN loans l ON l.assigned_agent_id = a.id 
@@ -46,6 +50,6 @@ func (r *AgentRepository) GetAvailableAgent() *models.Agent {
 	}
 
 	var agent models.Agent
-	r.db.DB.First(&agent, loads[0].ID)
+	r.DB.DB.First(&agent, loads[0].ID)
 	return &agent
 }

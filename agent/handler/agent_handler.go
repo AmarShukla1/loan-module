@@ -17,6 +17,28 @@ func NewAgentHandler(agentService *service.AgentService) *AgentHandler {
 	return &AgentHandler{agentService: agentService}
 }
 
+func (h *AgentHandler) CreateAgent(c *gin.Context) {
+	var req models.CreateAgentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate required fields
+	if req.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
+		return
+	}
+
+	agent, err := h.agentService.CreateAgent(&req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Agent created successfully", "agent": agent})
+}
+
 func (h *AgentHandler) MakeDecision(c *gin.Context) {
 	agentID, err := strconv.Atoi(c.Param("agent_id"))
 	if err != nil {

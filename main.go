@@ -78,6 +78,7 @@ func main() {
 		v1.GET("/loans/:id", loanHandler.GetLoanByID)
 
 		// Agent endpoints
+		v1.POST("/agents", agentHandler.CreateAgent)
 		v1.PUT("/agents/:agent_id/loans/:loan_id/decision", agentHandler.MakeDecision)
 	}
 
@@ -91,4 +92,6 @@ func initSampleData(agentRepo *agentRepo.AgentRepository) {
 	agentRepo.AddAgent(&agentModels.Agent{ID: 2, Name: "Alice Agent", ManagerID: &[]int{1}[0]})
 	agentRepo.AddAgent(&agentModels.Agent{ID: 3, Name: "Bob Agent", ManagerID: &[]int{1}[0]})
 
+	// Update the sequence to prevent primary key conflicts
+	agentRepo.DB.DB.Exec("SELECT setval('agents_id_seq', (SELECT MAX(id) FROM agents))")
 }

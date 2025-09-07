@@ -1,9 +1,4 @@
--- Loan Origination System (LOS) Database Schema
--- This file contains the complete database schema with foreign key relationships
 
--- =============================================
--- CUSTOMERS TABLE
--- =============================================
 CREATE TABLE customers (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -12,31 +7,24 @@ CREATE TABLE customers (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create unique index on phone for customer deduplication
 CREATE UNIQUE INDEX idx_customers_phone ON customers(phone);
 
--- =============================================
--- AGENTS TABLE
--- =============================================
 CREATE TABLE agents (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     manager_id INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
-    -- Foreign key constraint: Self-referencing for manager hierarchy
+    
     CONSTRAINT fk_agents_manager 
         FOREIGN KEY (manager_id) 
         REFERENCES agents(id) 
         ON DELETE SET NULL
 );
 
--- Create index on manager_id for hierarchy queries
 CREATE INDEX idx_agents_manager_id ON agents(manager_id);
 
--- =============================================
--- LOANS TABLE
--- =============================================
+
 CREATE TABLE loans (
     id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL,
@@ -61,13 +49,10 @@ CREATE TABLE loans (
         ON DELETE SET NULL
 );
 
--- Create indexes for foreign key relationships
+
 CREATE INDEX idx_loans_customer_id ON loans(customer_id);
 CREATE INDEX idx_loans_assigned_agent_id ON loans(assigned_agent_id);
 
--- =============================================
--- LOAN ASSIGNMENTS TABLE
--- =============================================
 CREATE TABLE loan_assignments (
     id SERIAL PRIMARY KEY,
     loan_id INTEGER NOT NULL,

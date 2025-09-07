@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"loan-module/constants"
 	"net/http"
 	"strconv"
 
@@ -36,11 +37,11 @@ func (h *LoanHandler) GetLoansByStatus(c *gin.Context) {
 	status := models.LoanStatus(c.Query("status"))
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
-	if page < 1 {
-		page = 1
+	if page < constants.DefaultMinPage {
+		page = constants.DefaultPage
 	}
-	if size < 1 || size > 100 {
-		size = 10
+	if size < constants.DefaultMinPageSize || size > constants.DefaultMaxPageSize {
+		size = constants.DefaultPageSize
 	}
 	loans := h.loanService.GetLoansByStatus(status, page, size)
 	response := gin.H{"loans": loans, "page": page, "size": size, "total": len(loans)}
