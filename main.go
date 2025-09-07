@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"loan-module/providers"
 	"log"
 	"net/http"
 
@@ -21,7 +22,7 @@ import (
 
 	agentModels "loan-module/agent/models"
 	"loan-module/notification"
-	"loan-module/repository"
+	database "loan-module/repository"
 )
 
 func main() {
@@ -29,13 +30,14 @@ func main() {
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
-	dsn := "host=localhost user=AmarShukla password=secret dbname=loandb port=5432 sslmode=disable TimeZone=UTC"
-	if dsn == "" {
-		log.Fatal("DATABASE_DSN environment variable not set")
+	// Load configuration from YAML file
+	config, err := providers.GetConfig("loan-module-configuration.yaml")
+	if err != nil {
+		log.Fatal("Failed to load configuration: ", err)
 	}
 
-	// Initialize database
-	db := database.NewDatabase(dsn)
+	// Initialize database with configuration
+	db := database.NewDatabaseWithConfig(config)
 
 	// Initialize repositories
 	customerRepository := customerRepo.NewCustomerRepository(db)
@@ -90,12 +92,3 @@ func initSampleData(agentRepo *agentRepo.AgentRepository) {
 	agentRepo.AddAgent(&agentModels.Agent{ID: 3, Name: "Bob Agent", ManagerID: &[]int{1}[0]})
 
 }
-
-//services is core
-//check all apis implementation
-//status count and pagination dekho
-
-//agent shouldn't be a manager of itself
-
-//implement mutex or thread safety
-//add yaml file for db

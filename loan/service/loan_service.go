@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"loan-module/constants"
 	"log"
 	"math/rand"
 	"sync"
@@ -17,7 +18,6 @@ import (
 )
 
 // Worker pool config
-const workerCount = 5
 
 type LoanService struct {
 	repo                *repository.LoanRepository
@@ -62,18 +62,18 @@ func (s *LoanService) SubmitLoan(req *loanModels.SubmitLoanRequest) (*loanModels
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return loan, nil
 }
 
 func (s *LoanService) StartLoanProcessor(ctx context.Context) {
 	log.Println("Starting loan processor with worker pool...")
 
-	jobChan := make(chan *loanModels.Loan, 100)
+	jobChan := make(chan *loanModels.Loan, constants.ChannelBufferSize)
 
 	// Start workers
 	var wg sync.WaitGroup
-	for i := 0; i < workerCount; i++ {
+	for i := 0; i < constants.Workers; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
@@ -95,7 +95,7 @@ func (s *LoanService) StartLoanProcessor(ctx context.Context) {
 	}
 
 	// Feed jobs periodically
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(constants.TimeIntervalToFeedJobs)
 	defer ticker.Stop()
 
 	for {
@@ -109,7 +109,7 @@ func (s *LoanService) StartLoanProcessor(ctx context.Context) {
 					log.Printf("Error updating loan %d status: %v", loan.ID, err)
 					continue
 				}
-				
+
 				// Send to job channel
 				jobChan <- loan
 			}
@@ -137,28 +137,26 @@ func (s *LoanService) processLoan(loan *loanModels.Loan) {
 	// Determine the loan status based on amount
 	var newStatus loanModels.LoanStatus
 	switch {
-	case loan.LoanAmount < 10000:
-	
-		
+	case loan.LoanAmount < constants.MinAmountApproveBySystem:
+
 		newStatus = loanModels.ApprovedBySystem
 		s.notificationService.SendSMS(customer.Phone, "Your loan has been approved by system.")
-		
+
 		loan.ApplicationStatus = newStatus
 		if err := s.repo.UpdateLoan(loan); err != nil {
 			log.Printf("Error updating loan %d: %v", loan.ID, err)
 		}
-		
-	case loan.LoanAmount > 500000:
-	
-		
+
+	case loan.LoanAmount > constants.MaxAmountApproveBySystem:
+
 		newStatus = loanModels.RejectedBySystem
 		s.notificationService.SendSMS(customer.Phone, "loan application has been rejected by system.")
-		
+
 		loan.ApplicationStatus = newStatus
 		if err := s.repo.UpdateLoan(loan); err != nil {
 			log.Printf("Error updating loan %d: %v", loan.ID, err)
 		}
-		
+
 	default:
 		err := s.assignToAgent(loan, customer)
 		if err != nil {

@@ -1,0 +1,10 @@
+db:
+  timeZone: "UTC"
+  host: "localhost"
+  user: "AmarShukla"
+  password: "postgres"
+  port: 5432
+  name: "loandb"
+  timeout: 5
+  maxIdleConn: 2
+  maxOpenConn: 4
